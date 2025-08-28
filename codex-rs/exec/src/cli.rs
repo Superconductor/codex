@@ -2,7 +2,6 @@ use clap::Parser;
 use clap::ValueEnum;
 use codex_common::CliConfigOverrides;
 use std::path::PathBuf;
-use uuid::Uuid;
 
 #[derive(Parser, Debug)]
 #[command(version)]
@@ -66,7 +65,7 @@ pub struct Cli {
 
     /// Optional conversation ID to start from. If not supplied, a new conversation will be created.
     #[arg(long = "conversation-id")]
-    pub conversation_id: Option<Uuid>,
+    pub conversation_id: Option<uuid::Uuid>,
 
     /// Initial instructions for the agent. If not provided as an argument (or
     /// if `-` is used), instructions are read from stdin.
