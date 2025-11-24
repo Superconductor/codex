@@ -18,6 +18,7 @@ use codex_core::protocol::Event;
 use codex_core::protocol::EventMsg;
 use codex_core::protocol::InputItem;
 use codex_core::protocol::Op;
+use codex_core::protocol::SessionConfiguredEvent;
 use codex_core::protocol::TaskCompleteEvent;
 use codex_core::util::is_inside_git_repo;
 use codex_login::AuthManager;
@@ -47,6 +48,7 @@ pub async fn run_main(cli: Cli, codex_linux_sandbox_exe: Option<PathBuf>) -> any
         last_message_file,
         json: json_mode,
         sandbox_mode: sandbox_mode_cli_arg,
+        conversation_id,
         prompt,
         config_overrides,
     } = cli;
@@ -192,11 +194,34 @@ pub async fn run_main(cli: Cli, codex_linux_sandbox_exe: Option<PathBuf>) -> any
         config.codex_home.clone(),
         config.preferred_auth_method,
     ));
-    let NewConversation {
-        conversation_id: _,
-        conversation,
-        session_configured,
-    } = conversation_manager.new_conversation(config).await?;
+    
+    let (conversation, session_configured) = match conversation_id {
+        Some(id) => {
+            // Look up existing conversation
+            info!("Looking up existing conversation with ID: {id}");
+            let existing_conversation = conversation_manager.get_conversation(id).await?;
+            info!("Found existing conversation with ID: {id}");
+            // For existing conversations, we don't have a session_configured event to return,
+            // so we create a default one
+            let default_session_configured = SessionConfiguredEvent {
+                session_id: id,
+                model: "existing".to_string(),
+                history_log_id: 0,
+                history_entry_count: 0,
+            };
+            (existing_conversation, default_session_configured)
+        }
+        None => {
+            // Create new conversation
+            let NewConversation {
+                conversation_id: new_id,
+                conversation,
+                session_configured,
+            } = conversation_manager.new_conversation(config).await?;
+            info!("Created new conversation with ID: {new_id}");
+            (conversation, session_configured)
+        }
+    };
     info!("Codex initialized with event: {session_configured:?}");
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Event>();
